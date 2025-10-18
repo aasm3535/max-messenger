@@ -1,71 +1,91 @@
-import { useCallback, useEffect, useState } from 'react'
-import Button from '../components/Button'
-import ClickCount from '../components/ClickCount'
-import styles from '../styles/home.module.css'
+import { useState, useEffect } from 'react';
+import AuthForm from '../components/AuthForm';
+import ChatList from '../components/ChatList';
+import ChatWindow from '../components/ChatWindow';
+import ActiveUsers from '../components/ActiveUsers';
+import styles from '../styles/messenger.module.css';
 
-function throwError() {
-  console.log(
-    // The function body() is not defined
-    document.body()
-  )
-}
+export default function Home() {
+  const [user, setUser] = useState(null);
+  const [selectedChat, setSelectedChat] = useState(null);
+  const [chats, setChats] = useState([]);
 
-function Home() {
-  const [count, setCount] = useState(0)
-  const increment = useCallback(() => {
-    setCount((v) => v + 1)
-  }, [setCount])
-
+  // Загружаем пользователя из localStorage при монтировании
   useEffect(() => {
-    const r = setInterval(() => {
-      increment()
-    }, 1000)
-
-    return () => {
-      clearInterval(r)
+    const savedUser = localStorage.getItem('messenger_user');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (error) {
+        localStorage.removeItem('messenger_user');
+      }
     }
-  }, [increment])
+  }, []);
+
+  const handleAuth = (userData) => {
+    setUser(userData);
+    localStorage.setItem('messenger_user', JSON.stringify(userData));
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: user.id }),
+      });
+    } catch (error) {
+      console.error('Ошибка выхода:', error);
+    } finally {
+      setUser(null);
+      setSelectedChat(null);
+      localStorage.removeItem('messenger_user');
+    }
+  };
+
+  const handleChatSelect = (chat) => {
+    setSelectedChat(chat);
+  };
+
+  const handleSendMessage = (message) => {
+    // Обновляем чаты после отправки сообщения
+    // В реальном приложении лучше использовать WebSocket или polling
+  };
+
+  if (!user) {
+    return <AuthForm onAuth={handleAuth} />;
+  }
 
   return (
-    <main className={styles.main}>
-      <h1>Fast Refresh Demo</h1>
-      <p>
-        Fast Refresh is a Next.js feature that gives you instantaneous feedback
-        on edits made to your React components, without ever losing component
-        state.
-      </p>
-      <hr className={styles.hr} />
-      <div>
-        <p>
-          Auto incrementing value. The counter won't reset after edits or if
-          there are errors.
-        </p>
-        <p>Current value: {count}</p>
+    <div className={styles.messenger}>
+      <div className={styles.header}>
+        <h1>Мессенджер</h1>
+        <div className={styles.userInfo}>
+          <span>Привет, {user.username}!</span>
+          <button onClick={handleLogout} className={styles.logoutButton}>
+            Выйти
+          </button>
+        </div>
       </div>
-      <hr className={styles.hr} />
-      <div>
-        <p>Component with state.</p>
-        <ClickCount />
-      </div>
-      <hr className={styles.hr} />
-      <div>
-        <p>
-          The button below will throw 2 errors. You'll see the error overlay to
-          let you know about the errors but it won't break the page or reset
-          your state.
-        </p>
-        <Button
-          onClick={(e) => {
-            setTimeout(() => document.parentNode(), 0)
-            throwError()
-          }}
-        >
-          Throw an Error
-        </Button>
-      </div>
-      <hr className={styles.hr} />
-    </main>
-  )
-}
 
-export default Home
+      <div className={styles.mainContent}>
+        <ChatList
+          user={user}
+          onChatSelect={handleChatSelect}
+          selectedChatId={selectedChat?.id}
+        />
+        <ChatWindow
+          chat={selectedChat}
+          user={user}
+          onSendMessage={handleSendMessage}
+        />
+        <ActiveUsers
+          user={user}
+          onUserSelect={handleChatSelect}
+        />
+      </div>
+    </div>
+  );
+}
